@@ -1,6 +1,8 @@
+using System.Threading.Tasks;
+
 namespace MultiThreading
 {
     public interface IRunnable{
-        void Run();
+        Task Run();
     }
 }

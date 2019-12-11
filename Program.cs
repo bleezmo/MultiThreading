@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace MultiThreading
 {
@@ -6,15 +9,20 @@ namespace MultiThreading
     {
         static void Main(string[] args)
         {
-            foreach(var arg in args){
-                Activator.CreateInstance(AppDomain.CurrentDomain, args[1], null);
-                var type = typeof(IRunnable);
-                var runnable = Activator.CreateInstance(AppDomain.CurrentDomain.GetAssemblies()
-                                    .SelectMany(s => s.GetTypes())
-                                    .FirstOrDefault(p => type.IsAssignableFrom(p) && p.Name == arg)) as IRunnable;
-                runnable.Run();
+            Run(args);
+        }
+        static void Run(string[] args)
+        {
+            var runAll = args.Length == 0;
+            var type = typeof(IRunnable);
+            var runnables = AppDomain.CurrentDomain.GetAssemblies().SelectMany(s => s.GetTypes())
+                .Where(p => type.IsAssignableFrom(p) && p.IsClass && !p.IsAbstract && (runAll || args.Any(a => p.Name == a)))
+                .Select(p => new KeyValuePair<string, IRunnable>(p.Name, Activator.CreateInstance(p) as IRunnable));
+            foreach (var runnable in runnables)
+            {
+                Console.WriteLine($"Running {runnable.Key}");
+                runnable.Value.Run().Wait();
             }
-            Console.WriteLine("Hello Worlds!");
         }
     }
 }
