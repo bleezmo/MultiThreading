@@ -5,6 +5,7 @@
 (function () {
     var entries = [];
     getData();
+    //getData(); //uncomment to see js 'race condition'
     function getData() {
         entries = [];
         $.get("/home/getdata", function (data) {

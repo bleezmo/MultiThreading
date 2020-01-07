@@ -5,9 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using TestWebApplication.Models;
+using JsTestApp.Models;
 
-namespace TestWebApplication.Controllers
+namespace JsTestApp.Controllers
 {
     public class HomeController : Controller
     {
@@ -33,13 +33,12 @@ namespace TestWebApplication.Controllers
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
-
         [HttpGet]
         public async Task<JsonResult> GetData()
         {
-            await Task.Delay(500);
+            await Task.Delay(200);
             var strings = new List<string>();
-            for(var i = 0; i < 10; i++)
+            for (var i = 0; i < 10; i++)
             {
                 strings.Add($"Entry {i}");
             }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.Caching;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,86 +10,64 @@ namespace MultiThreading
 {
     public class LazyCache : IRunnable
     {
-        private static readonly ConcurrentDictionary<string, string> _dictionary = new ConcurrentDictionary<string, string>();
+        private static readonly MemoryCache _cacheManager = new MemoryCache("meh");
         private static readonly ConcurrentDictionary<string, Task<string>> _lazyDictionary = new ConcurrentDictionary<string, Task<string>>();
-        private static readonly SemaphoreSlim _sem = new SemaphoreSlim(1, 1);
 
         public async Task Run()
         {
+            Console.WriteLine("Running CacheIOCall1");
             var tasks = new List<Task>();
-            for(var i = 0; i < 10; i++)
+            for(var i = 0; i < 5; i++)
             {
-                tasks.Add(CacheIOCall3("hello"));
+                tasks.Add(CacheIOCall1("hello"));
             }
             await Task.WhenAll(tasks);
+            Console.WriteLine("Running CacheIOCall2");
             tasks = new List<Task>();
             for (var i = 0; i < 5; i++)
             {
-                tasks.Add(CacheIOCall3("hello"));
+                tasks.Add(CacheIOCall2("hello"));
             }
             await Task.WhenAll(tasks);
         }
+        /// <summary>
+        /// bad because multiple calls can occur in I/O
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
         private async Task<string> CacheIOCall1(string key)
         {
-            if(_dictionary.TryGetValue(key, out var value))
+            var value = _cacheManager.Get(key) as string;
+            if (value != null)
             {
                 return value;
             }
             value = await ExpensiveIOCall(key);
-            _dictionary[key] = value;
+            _cacheManager.AddOrGetExisting(key, value, DateTimeOffset.Now.AddMinutes(10));
             return value;
         }
+        /// <summary>
+        /// good
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
         private async Task<string> CacheIOCall2(string key)
         {
-            if (_dictionary.TryGetValue(key, out var value))
+            var value = _cacheManager.Get(key) as string;
+            if (value != null)
             {
                 return value;
             }
-            await _sem.WaitAsync();
-            try
-            {
-                value = await _lazyDictionary.GetOrAdd(key, k => ExpensiveIOCall(k));
-                return _dictionary.GetOrAdd(key, k =>
-                {
+            return await _lazyDictionary.GetOrAdd(key, async k => {
+                value = await ExpensiveIOCall(k);
+                _cacheManager.AddOrGetExisting(key, value, DateTimeOffset.Now.AddMinutes(10));
+                Timer t = null;
+                t = new Timer(dc => {
                     _lazyDictionary.Remove(key, out _);
-                    return value;
-                });
-            }
-            finally
-            {
-                _sem.Release();
-            }
-        }
-        private async Task<string> CacheIOCall3(string key)
-        {
-            if (_dictionary.TryGetValue(key, out var value))
-            {
+                    t.Dispose();
+                }, null, 1000, Timeout.Infinite);
                 return value;
-            }
-            await _sem.WaitAsync();
-            try
-            {
-                return await _lazyDictionary.GetOrAdd(key, k => {
-                    return Task.Run(async () =>
-                    {
-                        if(_dictionary.TryGetValue(k, out value))
-                        {
-                            _lazyDictionary.TryRemove(k, out _);
-                            return value;
-                        }
-                        var result = await ExpensiveIOCall(k);
-                        return _dictionary.GetOrAdd(k, k1 =>
-                        {
-                            _lazyDictionary.TryRemove(k1, out _);
-                            return result;
-                        });
-                    });
-                });
-            }
-            finally
-            {
-                _sem.Release();
-            }
+            });
         }
         private static async Task<string> ExpensiveIOCall(string key)
         {
