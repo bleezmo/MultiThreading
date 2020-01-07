@@ -15,14 +15,27 @@ namespace MultiThreading
 
         public async Task Run()
         {
-            Console.WriteLine("Running CacheIOCall1");
+            Console.WriteLine("Calling Cache demo 1");
             var tasks = new List<Task>();
             for(var i = 0; i < 5; i++)
             {
                 tasks.Add(CacheIOCall1("hello"));
             }
+            await Task.WhenAll(tasks); 
+            tasks = new List<Task>();
+            for (var i = 0; i < 5; i++)
+            {
+                tasks.Add(CacheIOCall1("hello"));
+            }
             await Task.WhenAll(tasks);
-            Console.WriteLine("Running CacheIOCall2");
+            _cacheManager.Remove("hello");
+            Console.WriteLine("Calling Cache demo 2");
+            tasks = new List<Task>();
+            for (var i = 0; i < 5; i++)
+            {
+                tasks.Add(CacheIOCall2("hello"));
+            }
+            await Task.WhenAll(tasks);
             tasks = new List<Task>();
             for (var i = 0; i < 5; i++)
             {

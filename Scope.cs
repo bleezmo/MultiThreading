@@ -21,10 +21,9 @@ namespace MultiThreading
                 Concat("B"),
                 Concat("C")
             };
-            await Task.WhenAll(tasks);
-            foreach(var t in tasks)
+            foreach(var result in await Task.WhenAll(tasks))
             {
-                Console.WriteLine(t.Result);
+                Console.WriteLine(result);
             }
         }
         protected virtual async Task DoStuff()
@@ -62,53 +61,6 @@ namespace MultiThreading
             }
             return string.Empty;
         }
-    }
-    public class NonAsyncSemScope : ScopeBase
-    {
-        static Scope _scope;
-        static readonly object _lock = new object();
-        static List<KeyValuePair<string, SemaphoreSlim>> _semaphores = new List<KeyValuePair<string, SemaphoreSlim>>();
-
-        protected override async Task<string> Concat(string prefix, int count = 0)
-        {
-            lock (_lock)
-            {
-                if (count == 0)
-                {
-                    _semaphores.Add(new KeyValuePair<string, SemaphoreSlim>(prefix, new SemaphoreSlim(_semaphores.Count == 0 ? 1 : 0, 1)));
-                }
-            }
-            if(count == 0)
-            {
-                await Task.Delay(500);
-            }
-            var nextIndex = 0;
-            for(var i = 0; i < _semaphores.Count; i++)
-            {
-                if(_semaphores[i].Key == prefix)
-                {
-                    nextIndex = (i + 1) % _semaphores.Count;
-                    Console.WriteLine($"Waiting on {prefix}{count}. next is {_semaphores[nextIndex].Key}{count}");
-                    await _semaphores[i].Value.WaitAsync();
-                    break;
-                }
-            }
-            _scope = new Scope(_scope, $"{prefix}{count}");
-            Console.WriteLine($"Releasing {_semaphores[nextIndex].Key}{count}");
-            _semaphores[nextIndex].Value.Release();
-            await DoStuff();
-            if (_scope != null) //sometimes scope is set to null from other threads
-            {
-                var msg = _scope.Message;
-                _scope = _scope.Parent;
-                return count < maxLoops ? $"{msg} => {await Concat(prefix, count + 1)}" : msg;
-            }
-            return string.Empty;
-        }
-    }
-    public class NoWaitScope : NonAsyncScope
-    {
-        protected override Task DoStuff() => Task.CompletedTask;
     }
     class Scope
     {
